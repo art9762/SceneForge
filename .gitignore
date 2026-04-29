@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+projects/
+.venv/
+dist/
+*.egg-info/
+.claude/
+web/.next/
+web/node_modules/
+node_modules/
+.pytest_cache/
+*.log
