@@ -13,6 +13,13 @@ dependencies = [
     "uvicorn>=0.30",
     "python-dotenv>=1.0",
     "rich>=13.0",
+    "loguru>=0.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
 ]
 
 [project.scripts]
@@ -21,3 +28,7 @@ sceneforge = "cli.main:app"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

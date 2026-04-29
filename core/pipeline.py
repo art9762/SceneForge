@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Awaitable
 
+from loguru import logger
 from rich.console import Console
 
 from .agents import (
@@ -94,11 +96,14 @@ class Pipeline:
             console.print(f"\n[bold cyan]━━━ Шаг {state.current_step + 1}/{len(self._steps)}: {step.description} ━━━[/bold cyan]")
 
             provider = self._get_provider()
+            t0 = time.monotonic()
             state = await step.execute(state, provider)
+            elapsed = time.monotonic() - t0
             state.current_step += 1
             self._save(state)
 
-            console.print(f"[green]✓ {step.description} — готово[/green]")
+            logger.info("Step {}/{} '{}' completed in {:.1f}s", state.current_step, len(self._steps), step.name, elapsed)
+            console.print(f"[green]✓ {step.description} — готово ({elapsed:.1f}s)[/green]")
 
         console.print("\n[bold green]🎬 Пайплайн завершён![/bold green]")
         return state

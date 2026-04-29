@@ -13,6 +13,7 @@ from rich.prompt import IntPrompt
 from core.pipeline import Pipeline
 from core.schemas.project import ProjectState
 from core.config import get_settings
+from core.agents.base import set_debug_mode
 
 app = typer.Typer(
     name="sceneforge",
@@ -49,8 +50,15 @@ def run(
     project_name: str = typer.Option(None, "--name", "-n", help="Название проекта (папки)"),
     provider: str = typer.Option("claude", "--provider", "-p", help="LLM провайдер: claude или openai"),
     model: str = typer.Option(None, "--model", "-m", help="Модель (по умолчанию из конфига)"),
+    debug: bool = typer.Option(False, "--debug", "-d", help="Показывать промпты и raw-ответы LLM"),
 ):
     """Запустить полный пайплайн генерации сценария."""
+    if debug:
+        set_debug_mode(True)
+        import loguru, sys
+        loguru.logger.remove()
+        loguru.logger.add(sys.stderr, level="DEBUG")
+
     settings = get_settings()
     name = project_name or idea[:40].replace(" ", "-").lower()
     project_dir = Path(settings.projects_dir) / name
@@ -80,8 +88,15 @@ def resume(
     project_path: str = typer.Argument(..., help="Путь к папке проекта"),
     provider: str = typer.Option("claude", "--provider", "-p"),
     model: str = typer.Option(None, "--model", "-m"),
+    debug: bool = typer.Option(False, "--debug", "-d", help="Показывать промпты и raw-ответы LLM"),
 ):
     """Продолжить незавершённый проект."""
+    if debug:
+        set_debug_mode(True)
+        import loguru, sys
+        loguru.logger.remove()
+        loguru.logger.add(sys.stderr, level="DEBUG")
+
     project_dir = Path(project_path)
     if not (project_dir / "project.json").exists():
         console.print("[red]project.json не найден в указанной папке[/red]")

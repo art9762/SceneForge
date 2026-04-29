@@ -6,7 +6,13 @@ import json
 from abc import ABC, abstractmethod
 from typing import Any
 
-from pydantic import BaseModel
+from loguru import logger
+from pydantic import BaseModel, ValidationError
+
+from .retry import retry_async
+
+# Maximum retries for JSON parse failures in generate_structured
+_JSON_PARSE_RETRIES = 2
 
 
 class LLMProvider(ABC):
@@ -36,6 +42,8 @@ class LLMProvider(ABC):
 
         Appends JSON schema instructions to the system prompt and
         parses the LLM output into the given Pydantic model.
+        Retries on JSON parse / validation errors up to _JSON_PARSE_RETRIES times.
+        Network errors are retried by retry_async inside generate().
         """
         schema_json = json.dumps(schema.model_json_schema(), ensure_ascii=False, indent=2)
         augmented_system = (
@@ -44,19 +52,45 @@ class LLMProvider(ABC):
             f"```json\n{schema_json}\n```\n"
             f"No commentary, no markdown fences — raw JSON only."
         )
-        raw = await self.generate(augmented_system, messages, model, temperature=temperature)
-        # Strip markdown fences if the model wraps them anyway
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        cleaned = cleaned.strip()
-        return schema.model_validate_json(cleaned)
+
+        last_exc: Exception | None = None
+        for attempt in range(_JSON_PARSE_RETRIES + 1):
+            raw = await self.generate(augmented_system, messages, model, temperature=temperature)
+
+            # Strip markdown fences if the model wraps them anyway
+            cleaned = raw.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            cleaned = cleaned.strip()
+
+            try:
+                return schema.model_validate_json(cleaned)
+            except (json.JSONDecodeError, ValidationError) as exc:
+                last_exc = exc
+                if attempt < _JSON_PARSE_RETRIES:
+                    logger.warning(
+                        "JSON parse failed (attempt {}/{}): {} — retrying LLM call",
+                        attempt + 1,
+                        _JSON_PARSE_RETRIES + 1,
+                        exc,
+                    )
+                else:
+                    logger.error(
+                        "JSON parse failed after {} attempts. Raw response: {}",
+                        _JSON_PARSE_RETRIES + 1,
+                        raw[:500],
+                    )
+
+        raise last_exc  # type: ignore[misc]
 
 
 def get_provider(name: str) -> LLMProvider:
-    """Factory: 'claude' or 'openai'."""
+    """Factory: 'claude' or 'openai'. Validates API key is set."""
+    from ..config import get_settings
+    get_settings().validate_provider(name)
+
     if name == "claude":
         from .claude import ClaudeProvider
         return ClaudeProvider()

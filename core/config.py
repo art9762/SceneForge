@@ -24,6 +24,21 @@ class Settings(BaseSettings):
     # Project storage
     projects_dir: str = "projects"
 
+    def validate_provider(self, provider: str) -> None:
+        """Raise a clear error if the API key for the chosen provider is missing."""
+        if provider == "claude" and not self.trinity_claude_api_key:
+            raise ValueError(
+                "TRINITY_CLAUDE_API_KEY не задан.\n"
+                "Скопируйте .env.example в .env и заполните ключ:\n"
+                "  cp .env.example .env"
+            )
+        if provider == "openai" and not self.trinity_openai_api_key:
+            raise ValueError(
+                "TRINITY_OPENAI_API_KEY не задан.\n"
+                "Скопируйте .env.example в .env и заполните ключ:\n"
+                "  cp .env.example .env"
+            )
+
 
 _settings: Settings | None = None
 

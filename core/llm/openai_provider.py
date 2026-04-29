@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from openai import AsyncOpenAI
+from loguru import logger
 
 from ..config import get_settings
 from .provider import LLMProvider
+from .retry import retry_async
 
 
 class OpenAIProvider(LLMProvider):
@@ -25,11 +27,16 @@ class OpenAIProvider(LLMProvider):
         temperature: float = 0.7,
     ) -> str:
         s = get_settings()
+        resolved_model = model or s.default_openai_model
         full_messages = [{"role": "system", "content": system}] + messages
-        resp = await self._client.chat.completions.create(
-            model=model or s.default_openai_model,
-            messages=full_messages,
-            temperature=temperature,
-            max_tokens=8192,
-        )
-        return resp.choices[0].message.content
+
+        async def _call() -> str:
+            resp = await self._client.chat.completions.create(
+                model=resolved_model,
+                messages=full_messages,
+                temperature=temperature,
+                max_tokens=8192,
+            )
+            return resp.choices[0].message.content
+
+        return await retry_async(_call)

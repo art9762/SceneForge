@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import anthropic
+from loguru import logger
 
 from ..config import get_settings
 from .provider import LLMProvider
+from .retry import retry_async
 
 
 class ClaudeProvider(LLMProvider):
@@ -25,11 +27,16 @@ class ClaudeProvider(LLMProvider):
         temperature: float = 0.7,
     ) -> str:
         s = get_settings()
-        resp = await self._client.messages.create(
-            model=model or s.default_claude_model,
-            max_tokens=8192,
-            system=system,
-            messages=messages,
-            temperature=temperature,
-        )
-        return resp.content[0].text
+        resolved_model = model or s.default_claude_model
+
+        async def _call() -> str:
+            resp = await self._client.messages.create(
+                model=resolved_model,
+                max_tokens=8192,
+                system=system,
+                messages=messages,
+                temperature=temperature,
+            )
+            return resp.content[0].text
+
+        return await retry_async(_call)

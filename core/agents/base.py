@@ -2,13 +2,23 @@
 
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
 from typing import ClassVar
 
+from loguru import logger
 from pydantic import BaseModel
 
 from ..llm.provider import LLMProvider, get_provider
 from ..config import get_settings
+
+# Global debug flag — when True, agents log prompts and raw responses
+_debug_mode: bool = False
+
+
+def set_debug_mode(enabled: bool) -> None:
+    global _debug_mode
+    _debug_mode = enabled
 
 
 class BaseAgent(ABC):
@@ -43,12 +53,33 @@ class BaseAgent(ABC):
         user_message = self.build_user_message(input_data)
         messages = [{"role": "user", "content": user_message}]
 
+        provider_name = type(provider).__name__
+        logger.info(
+            "Agent '{}' starting | provider={} model={}",
+            self.name, provider_name, model,
+        )
+
+        if _debug_mode:
+            logger.debug("System prompt:\n{}", self.system_prompt[:500])
+            logger.debug("User message:\n{}", user_message[:500])
+
+        t0 = time.monotonic()
         result = await provider.generate_structured(
             system=self.system_prompt,
             messages=messages,
             model=model,
             schema=self.output_schema,
         )
+        elapsed = time.monotonic() - t0
+
+        logger.info(
+            "Agent '{}' completed in {:.1f}s",
+            self.name, elapsed,
+        )
+
+        if _debug_mode:
+            logger.debug("Agent '{}' output: {}", self.name, result.model_dump_json()[:500])
+
         return result
 
     def build_user_message(self, input_data: BaseModel) -> str:
