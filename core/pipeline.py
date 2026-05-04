@@ -137,7 +137,11 @@ class Pipeline:
         return state
 
     async def _step_structure(self, state: ProjectState, provider: LLMProvider | None) -> ProjectState:
-        concept = state.concepts.concepts[state.selected_concept_index]
+        idx = state.selected_concept_index
+        n = len(state.concepts.concepts)
+        if not (0 <= idx < n):
+            raise ValueError(f"selected_concept_index {idx} out of range [0, {n})")
+        concept = state.concepts.concepts[idx]
         agent = StoryArchitect()
         state.structure = await agent.run(
             StructureInput(brief=state.brief, concept=concept), provider, self.model

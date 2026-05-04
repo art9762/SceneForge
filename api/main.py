@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import re
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from loguru import logger
+from pydantic import BaseModel, Field
 
 from core.config import get_settings
 from core.pipeline import Pipeline
@@ -25,16 +28,32 @@ app.add_middleware(
 # In-memory tracking of running pipelines
 _running: dict[str, asyncio.Task] = {}
 
+ALLOWED_FINAL_FILES = {"script.md", "teleprompter.md"}
+
+
+def _sanitize_name(raw: str) -> str:
+    name = re.sub(r"[^a-zA-Z0-9_\-а-яА-ЯёЁ]", "-", raw)
+    name = re.sub(r"-{2,}", "-", name)
+    return name[:80].strip("-") or "project"
+
+
+def _safe_project_path(project_dir: str) -> Path:
+    base = Path(get_settings().projects_dir).resolve()
+    candidate = (base / project_dir).resolve()
+    if not str(candidate).startswith(str(base) + os.sep) and candidate != base:
+        raise HTTPException(400, "Invalid project path")
+    return candidate
+
 
 class CreateProjectRequest(BaseModel):
-    raw_idea: str
-    project_name: str | None = None
-    provider: str = "claude"
-    model: str | None = None
+    raw_idea: str = Field(..., min_length=1, max_length=4000)
+    project_name: str | None = Field(None, max_length=80)
+    provider: str = Field("claude", pattern=r"^(claude|openai)$")
+    model: str | None = Field(None, max_length=100)
 
 
 class SelectConceptRequest(BaseModel):
-    concept_index: int
+    concept_index: int = Field(..., ge=0, le=2)
 
 
 class StepResponse(BaseModel):
@@ -59,8 +78,8 @@ async def _web_select_concept(state: ProjectState) -> int:
 @app.post("/api/projects", response_model=dict)
 async def create_project(req: CreateProjectRequest):
     settings = get_settings()
-    name = req.project_name or req.raw_idea[:40].replace(" ", "-").lower()
-    project_dir = Path(settings.projects_dir) / name
+    name = _sanitize_name(req.project_name or req.raw_idea[:40])
+    project_dir = Path(settings.projects_dir).resolve() / name
 
     pipeline = Pipeline(
         project_dir=project_dir,
@@ -69,18 +88,16 @@ async def create_project(req: CreateProjectRequest):
         on_select_concept=_web_select_concept,
     )
 
-    # Create initial state
     state = ProjectState(raw_idea=req.raw_idea)
     state.save(project_dir / "project.json")
 
     _concept_queues[state.id] = asyncio.Queue()
 
-    # Run pipeline in background
     async def _run():
         try:
             await pipeline.run(raw_idea=req.raw_idea)
         except Exception as e:
-            print(f"Pipeline error: {e}")
+            logger.error("Pipeline {} failed: {}", state.id, e)
 
     task = asyncio.create_task(_run())
     _running[state.id] = task
@@ -90,7 +107,8 @@ async def create_project(req: CreateProjectRequest):
 
 @app.get("/api/projects/{project_dir:path}/state")
 async def get_project_state(project_dir: str):
-    state_file = Path(project_dir) / "project.json"
+    safe_dir = _safe_project_path(project_dir)
+    state_file = safe_dir / "project.json"
     if not state_file.exists():
         raise HTTPException(404, "Project not found")
     state = ProjectState.load(state_file)
@@ -117,7 +135,10 @@ async def select_concept(project_id: str, req: SelectConceptRequest):
 
 @app.get("/api/projects/{project_dir:path}/final/{filename}")
 async def get_final_file(project_dir: str, filename: str):
-    file_path = Path(project_dir) / "final" / filename
+    if filename not in ALLOWED_FINAL_FILES:
+        raise HTTPException(400, "Invalid filename")
+    safe_dir = _safe_project_path(project_dir)
+    file_path = safe_dir / "final" / filename
     if not file_path.exists():
         raise HTTPException(404, "File not found")
     return {"content": file_path.read_text(encoding="utf-8")}
