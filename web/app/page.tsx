@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createProject } from "@/lib/api";
+import { createProject, encodeProjectPath } from "@/lib/api";
 
 export default function Home() {
   const router = useRouter();
@@ -22,7 +22,7 @@ export default function Home() {
         project_name: name || undefined,
         provider,
       });
-      router.push(`/project/${res.project_dir}`);
+      router.push(`/project/${encodeProjectPath(res.project_dir)}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Ошибка");
     } finally {

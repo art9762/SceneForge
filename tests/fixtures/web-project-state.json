@@ -1,0 +1,59 @@
+{
+  "state": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "raw_idea": "Mock documentary",
+    "current_step": 2,
+    "brief": null,
+    "concepts": {
+      "concepts": [
+        {
+          "name": "Концепция 1",
+          "direction": "",
+          "logline": "История 1",
+          "synopsis": "Mock synopsis",
+          "tone_description": "",
+          "why_it_works": ""
+        },
+        {
+          "name": "Концепция 2",
+          "direction": "",
+          "logline": "История 2",
+          "synopsis": "Mock synopsis",
+          "tone_description": "",
+          "why_it_works": ""
+        },
+        {
+          "name": "Концепция 3",
+          "direction": "",
+          "logline": "История 3",
+          "synopsis": "Mock synopsis",
+          "tone_description": "",
+          "why_it_works": ""
+        }
+      ]
+    },
+    "selected_concept_index": null,
+    "structure": null,
+    "draft_v1": null,
+    "critique": null,
+    "draft_v2": null,
+    "production_notes": null,
+    "edit_notes": null,
+    "final_script": null,
+    "created_at": "2026-10-23T11:04:53.531543Z",
+    "updated_at": "2026-10-23T11:04:53.531701Z"
+  },
+  "steps": [
+    "brief",
+    "concepts",
+    "select_concept",
+    "structure",
+    "draft_v1",
+    "critique",
+    "draft_v2",
+    "production",
+    "edit_notes",
+    "assemble"
+  ],
+  "total_steps": 10
+}

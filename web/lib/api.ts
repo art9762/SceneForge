@@ -1,5 +1,36 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+export type Concept = {
+  name: string;
+  logline: string;
+  synopsis: string;
+  direction: string;
+  tone_description: string;
+  why_it_works: string;
+};
+
+export type ProjectData = {
+  state: {
+    id: string;
+    current_step: number;
+    brief: Record<string, unknown> | null;
+    concepts: { concepts: Concept[] } | null;
+    selected_concept_index: number | null;
+    critique: {
+      overall_score: number;
+      strengths: string[];
+      weaknesses: { area: string; issue: string; suggestion: string }[];
+      suggestions: string[];
+    } | null;
+  };
+  steps: string[];
+  total_steps: number;
+};
+
+export function encodeProjectPath(projectDir: string) {
+  return projectDir.split("/").map(encodeURIComponent).join("/");
+}
+
 export async function createProject(data: {
   raw_idea: string;
   project_name?: string;
@@ -16,20 +47,11 @@ export async function createProject(data: {
 }
 
 export async function getProjectState(projectDir: string) {
-  const res = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectDir)}/state`);
+  const res = await fetch(`${API_BASE}/api/projects/${encodeProjectPath(projectDir)}/state`, {
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{
-    state: {
-      brief?: unknown;
-      concepts?: { title: string; logline: string }[];
-      selected_concept?: unknown;
-      critique?: { score: number; notes: string };
-      [key: string]: unknown;
-    };
-    steps: { name: string; status: string }[];
-    total_steps: number;
-    current_step: number;
-  }>;
+  return res.json() as Promise<ProjectData>;
 }
 
 export async function selectConcept(projectId: string, conceptIndex: number) {
@@ -42,8 +64,10 @@ export async function selectConcept(projectId: string, conceptIndex: number) {
   return res.json();
 }
 
-export async function getFinalFile(projectDir: string, filename: string) {
-  const res = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(projectDir)}/final/${filename}`);
+export type FinalFilename = "script.md" | "teleprompter.md";
+
+export async function getFinalFile(projectDir: string, filename: FinalFilename) {
+  const res = await fetch(`${API_BASE}/api/projects/${encodeProjectPath(projectDir)}/final/${filename}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json() as Promise<{ content: string }>;
 }

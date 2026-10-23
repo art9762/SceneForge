@@ -102,7 +102,8 @@ async def create_project(req: CreateProjectRequest):
     task = asyncio.create_task(_run())
     _running[state.id] = task
 
-    return {"project_id": state.id, "project_dir": str(project_dir)}
+    # URLs use paths relative to PROJECTS_DIR, never an absolute server path.
+    return {"project_id": state.id, "project_dir": name}
 
 
 @app.get("/api/projects/{project_dir:path}/state")
