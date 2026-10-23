@@ -22,7 +22,7 @@ export default function Home() {
         project_name: name || undefined,
         provider,
       });
-      router.push(`/project/${res.project_dir}`);
+      router.push(`/project/${encodeURIComponent(res.project_dir)}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Ошибка");
     } finally {

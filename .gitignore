@@ -12,3 +12,6 @@ web/node_modules/
 node_modules/
 .pytest_cache/
 *.log
+web/test-results/
+web/playwright-report/
+web/tsconfig.tsbuildinfo

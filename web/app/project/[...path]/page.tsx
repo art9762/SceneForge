@@ -1,158 +1,185 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
-import { getProjectState, selectConcept } from "@/lib/api";
-
-type StepInfo = { name: string; status: string };
-type ProjectData = Awaited<ReturnType<typeof getProjectState>>;
+import { useEffect, useReducer, useState } from "react";
+import { usePathname } from "next/navigation";
+import { getFinalFile, getProjectState, selectConcept, type FinalFilename, type ProjectResponse } from "@/lib/api";
 
 export default function ProjectPage() {
-  const params = useParams();
-  const projectDir = Array.isArray(params.path) ? params.path.join("/") : (params.path as string);
-
-  const [data, setData] = useState<ProjectData | null>(null);
-  const [error, setError] = useState("");
-
-  const poll = useCallback(async () => {
-    try {
-      const d = await getProjectState(projectDir);
-      setData(d);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Ошибка загрузки");
-    }
-  }, [projectDir]);
+  // Read the encoded URL once: catch-all params may retain escaped slashes
+  // during client navigation, while filesystem paths can contain literal %.
+  const projectDir = decodeURIComponent(usePathname().slice("/project/".length));
+  const [snapshot, setSnapshot] = useState<{ projectDir: string; data: ProjectResponse } | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [selecting, setSelecting] = useState(false);
+  const [submittedProject, setSubmittedProject] = useState("");
+  const [downloading, setDownloading] = useState<FinalFilename | null>(null);
+  const [refreshVersion, refresh] = useReducer((version: number) => version + 1, 0);
+  const data = snapshot?.projectDir === projectDir ? snapshot.data : null;
 
   useEffect(() => {
-    poll();
-    const id = setInterval(poll, 3000);
-    return () => clearInterval(id);
-  }, [poll]);
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const controller = new AbortController();
+
+    async function poll() {
+      try {
+        const next = await getProjectState(projectDir, controller.signal);
+        if (!active) return;
+        setSnapshot({ projectDir, data: next });
+        setLoadError("");
+      } catch (error: unknown) {
+        if (active) setLoadError(error instanceof Error ? error.message : "Ошибка загрузки");
+      } finally {
+        if (active) timer = setTimeout(poll, 3000);
+      }
+    }
+
+    timer = setTimeout(poll, 0);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [projectDir, refreshVersion]);
 
   async function handleSelect(index: number) {
-    // project_id is typically the last segment of projectDir
-    const projectId = projectDir.split("/").pop() || projectDir;
-    await selectConcept(projectId, index);
-    poll();
+    if (!data || selecting || submittedProject === data.state.id) return;
+    setSelecting(true);
+    setActionError("");
+    try {
+      await selectConcept(data.state.id, index);
+      setSubmittedProject(data.state.id);
+      refresh();
+    } catch (error: unknown) {
+      setActionError(error instanceof Error ? error.message : "Не удалось выбрать концепцию");
+    } finally {
+      setSelecting(false);
+    }
   }
 
-  if (error) return <div className="p-8 text-red-400">{error}</div>;
-  if (!data) return <div className="p-8 text-zinc-400">Загрузка...</div>;
+  async function download(filename: FinalFilename) {
+    setDownloading(filename);
+    setActionError("");
+    try {
+      const { content } = await getFinalFile(projectDir, filename);
+      const url = URL.createObjectURL(new Blob([content], { type: "text/markdown;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error: unknown) {
+      setActionError(error instanceof Error ? error.message : "Не удалось скачать файл");
+    } finally {
+      setDownloading(null);
+    }
+  }
 
-  const { state, steps, total_steps, current_step } = data;
-  const progress = total_steps > 0 ? (current_step / total_steps) * 100 : 0;
-  const isDone = steps.every((s: StepInfo) => s.status === "done");
-  const needsSelection = steps.some(
-    (s: StepInfo) => s.name === "select_concept" && s.status === "waiting"
-  ) && state.concepts && !state.selected_concept;
+  if (!data) return <div className="p-8 text-zinc-400" role={loadError ? "alert" : "status"}>{loadError || "Загрузка..."}</div>;
+
+  const { state, steps, total_steps } = data;
+  const currentStep = Math.max(0, Math.min(state.current_step, total_steps));
+  const progress = total_steps > 0 ? (currentStep / total_steps) * 100 : 0;
+  const isDone = total_steps > 0 && state.current_step >= total_steps;
+  const concepts = state.concepts?.concepts ?? [];
+  const needsSelection = steps[state.current_step] === "select_concept"
+    && concepts.length > 0 && state.selected_concept_index === null;
+  const selectedConcept = state.selected_concept_index === null
+    ? null : concepts[state.selected_concept_index];
 
   return (
-    <div className="flex-1 p-8 max-w-3xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-white">Проект: {projectDir.split("/").pop()}</h1>
+    <main className="flex-1 p-8 max-w-3xl w-full mx-auto space-y-6">
+      <h1 className="text-2xl font-bold text-white break-words">Проект: {projectDir.split("/").pop()}</h1>
+      {(loadError || actionError) && <p role="alert" className="text-red-400">{actionError || loadError}</p>}
 
-      {/* Progress */}
       <div>
         <div className="flex justify-between text-sm text-zinc-400 mb-1">
-          <span>Прогресс</span>
-          <span>{current_step}/{total_steps}</span>
+          <span>Прогресс</span><span>{currentStep}/{total_steps}</span>
         </div>
-        <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-blue-600 transition-all duration-500"
-            style={{ width: `${progress}%` }}
-          />
+        <div role="progressbar" aria-label="Прогресс проекта" aria-valuemin={0} aria-valuemax={total_steps} aria-valuenow={currentStep} className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden">
+          <div className="h-full bg-blue-600 transition-all duration-500" style={{ width: `${progress}%` }} />
         </div>
+        <p className="text-sm text-zinc-400 mt-2">{isDone ? "Пайплайн завершён" : "Показан последний сохранённый шаг"}</p>
       </div>
 
-      {/* Steps */}
-      <ul className="space-y-1">
-        {steps.map((s: StepInfo) => (
-          <li key={s.name} className="flex items-center gap-2 text-sm">
-            <span>
-              {s.status === "done" ? "✅" : s.status === "running" ? "⏳" : "⬜"}
-            </span>
-            <span className={s.status === "done" ? "text-zinc-300" : "text-zinc-500"}>
-              {s.name}
-            </span>
+      <ol className="space-y-1" aria-label="Шаги проекта">
+        {steps.map((name, index) => (
+          <li key={name} aria-current={index === currentStep ? "step" : undefined} className="flex items-center gap-2 text-sm">
+            <span aria-hidden="true">{index < currentStep ? "✅" : index === currentStep ? "→" : "⬜"}</span>
+            <span className={index <= currentStep ? "text-zinc-300" : "text-zinc-500"}>{name}</span>
           </li>
         ))}
-      </ul>
+      </ol>
 
-      {/* Brief */}
-      {state.brief != null && (
-        <div className="bg-zinc-800 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-zinc-400 mb-1">Бриф</h3>
-          <p className="text-zinc-200 text-sm whitespace-pre-wrap">
-            {String(typeof state.brief === "string" ? state.brief : JSON.stringify(state.brief, null, 2))}
-          </p>
-        </div>
+      {state.brief !== null && (
+        <section className="bg-zinc-800 rounded-lg p-4 space-y-2">
+          <h2 className="text-sm font-medium text-zinc-400 mb-1">Бриф</h2>
+          <h3 className="text-white font-medium">{state.brief.title}</h3>
+          <p className="text-zinc-300 text-sm">{[state.brief.format, state.brief.duration_minutes > 0 ? `${state.brief.duration_minutes} мин` : "", state.brief.platform].filter(Boolean).join(" · ")}</p>
+          <dl className="text-zinc-200 text-sm space-y-1">
+            {Object.entries({ "Аудитория": state.brief.target_audience, "Тон": state.brief.tone, "Стиль": state.brief.style, "Цель": state.brief.goal }).filter(([, value]) => value).map(([label, value]) => (
+              <div key={label}><dt className="inline text-zinc-400">{label}: </dt><dd className="inline">{value}</dd></div>
+            ))}
+          </dl>
+          {state.brief.constraints.length > 0 && <ul className="text-zinc-300 text-sm list-disc pl-5">{state.brief.constraints.map((text, index) => <li key={index}>{text}</li>)}</ul>}
+          {state.brief.keywords.length > 0 && <p className="text-zinc-400 text-sm">{state.brief.keywords.join(", ")}</p>}
+        </section>
       )}
 
-      {/* Concept Selection */}
-      {needsSelection && state.concepts != null && (
-        <div className="space-y-3">
-          <h3 className="text-lg font-medium text-white">Выберите концепцию</h3>
-          <div className="grid gap-3">
-            {(state.concepts as { title: string; logline: string }[]).map((c, i) => (
-              <div key={i} className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
-                <h4 className="font-medium text-white">{c.title}</h4>
-                <p className="text-zinc-400 text-sm mt-1">{c.logline}</p>
-                <button
-                  onClick={() => handleSelect(i)}
-                  className="mt-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-sm text-white transition"
-                >
-                  Выбрать
-                </button>
-              </div>
+      {needsSelection && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-medium text-white">Выберите концепцию</h2>
+          {submittedProject === state.id ? <p role="status" className="text-zinc-300">Выбор отправлен. Ждём следующий шаг…</p> : (
+            <div className="grid gap-3">
+              {concepts.map((concept, index) => (
+                <div key={index} className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
+                  <h3 className="font-medium text-white">{concept.name}</h3>
+                  <p className="text-zinc-400 text-sm mt-1">{concept.logline}</p>
+                  <p className="text-zinc-400 text-sm mt-1">{concept.synopsis}</p>
+                  <button onClick={() => handleSelect(index)} disabled={selecting} className="mt-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded text-sm text-white transition">
+                    {selecting ? "Отправляем…" : "Выбрать"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {selectedConcept && (
+        <section className="bg-zinc-800 rounded-lg p-4">
+          <h2 className="text-sm font-medium text-zinc-400 mb-1">Выбранная концепция</h2>
+          <h3 className="text-white">{selectedConcept.name}</h3>
+          <p className="text-zinc-200 text-sm">{selectedConcept.logline}</p>
+        </section>
+      )}
+
+      {state.critique !== null && (
+        <section className="bg-zinc-800 rounded-lg p-4 space-y-2">
+          <h2 className="text-sm font-medium text-zinc-400">Критика — оценка: {state.critique.overall_score}/10</h2>
+          <ul className="text-zinc-200 text-sm list-disc pl-5">{state.critique.strengths.map((text, index) => <li key={index}>{text}</li>)}</ul>
+          {state.critique.weaknesses.map((item, index) => (
+            <p key={index} className="text-zinc-200 text-sm"><strong>{item.area}:</strong> {item.issue} — {item.suggestion}</p>
+          ))}
+          <ul className="text-zinc-200 text-sm list-disc pl-5">{state.critique.suggestions.map((text, index) => <li key={index}>{text}</li>)}</ul>
+        </section>
+      )}
+
+      {isDone && (
+        <section className="space-y-2">
+          <h2 className="text-lg font-medium text-white">Готовые файлы</h2>
+          <div className="flex flex-wrap gap-3">
+            {(["script.md", "teleprompter.md"] as const).map((filename) => (
+              <button key={filename} onClick={() => download(filename)} disabled={downloading !== null} className="px-4 py-2 bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded text-white text-sm transition">
+                {downloading === filename ? "Скачиваем…" : filename}
+              </button>
             ))}
           </div>
-        </div>
+        </section>
       )}
-
-      {/* Selected concept */}
-      {state.selected_concept != null && (
-        <div className="bg-zinc-800 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-zinc-400 mb-1">Выбранная концепция</h3>
-          <p className="text-zinc-200 text-sm whitespace-pre-wrap">
-            {String(typeof state.selected_concept === "string"
-              ? state.selected_concept
-              : JSON.stringify(state.selected_concept, null, 2))}
-          </p>
-        </div>
-      )}
-
-      {/* Critique */}
-      {state.critique != null && (
-        <div className="bg-zinc-800 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-zinc-400 mb-1">
-            Критика — оценка: {(state.critique as { score: number }).score}/10
-          </h3>
-          <p className="text-zinc-200 text-sm">{(state.critique as { notes: string }).notes}</p>
-        </div>
-      )}
-
-      {/* Final files */}
-      {isDone && (
-        <div className="space-y-2">
-          <h3 className="text-lg font-medium text-white">Готовые файлы</h3>
-          <div className="flex gap-3">
-            <a
-              href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/projects/${encodeURIComponent(projectDir)}/final/script.md`}
-              target="_blank"
-              className="px-4 py-2 bg-green-700 hover:bg-green-600 rounded text-white text-sm transition"
-            >
-              📄 script.md
-            </a>
-            <a
-              href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/projects/${encodeURIComponent(projectDir)}/final/teleprompter.md`}
-              target="_blank"
-              className="px-4 py-2 bg-green-700 hover:bg-green-600 rounded text-white text-sm transition"
-            >
-              📄 teleprompter.md
-            </a>
-          </div>
-        </div>
-      )}
-    </div>
+    </main>
   );
 }
