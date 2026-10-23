@@ -2,7 +2,7 @@
 
 SceneForge — AI writers' room для разработки сценариев видео. Проект принимает сырую идею и проводит её через типизированный, возобновляемый мультиагентный пайплайн: от брифа и концепций до финального сценария, продакшн-заметок и текста для телесуфлёра.
 
-Проектом можно управлять через Python CLI, FastAPI или Next.js Web UI. В браузере доступны создание проекта, сохранённый прогресс, выбор концепции и скачивание финальных Markdown-файлов.
+Проектом можно управлять через Python CLI, FastAPI или Next.js Web UI. В браузере доступны создание проекта, живое состояние запуска, выбор концепции, продолжение после ошибки или рестарта и скачивание финальных Markdown-файлов.
 
 ## Что генерирует SceneForge
 
@@ -24,7 +24,8 @@ SceneForge — AI writers' room для разработки сценариев �
 ## Требования
 
 - Python `>=3.12`.
-- Node.js и npm для опционального Web UI.
+- macOS или Linux с локальной файловой системой для общего API/CLI lock.
+- Node.js `>=20.9` и npm для опционального Web UI; CI использует Node 22.
 - API-ключ хотя бы одного провайдера:
   - `TRINITY_CLAUDE_API_KEY` для `--provider claude`.
   - `TRINITY_OPENAI_API_KEY` для `--provider openai`.
@@ -106,11 +107,11 @@ sceneforge status projects/my-project
 
 | Команда / опция | Назначение |
 | --- | --- |
-| `sceneforge run IDEA` | Создать или продолжить проект и пройти пайплайн. |
+| `sceneforge run IDEA` | Создать новый проект; существующее имя не перезаписывается. |
 | `sceneforge resume PROJECT_PATH` | Продолжить проект из папки с `project.json`. |
-| `sceneforge status PROJECT_PATH` | Показать сохранённый прогресс. |
+| `sceneforge status PROJECT_PATH` | Показать сохранённый прогресс и состояние запуска; распознать прерывание процесса. |
 | `--name`, `-n` | Имя папки проекта для `run`. |
-| `--provider`, `-p` | `claude` или `openai`; по умолчанию `claude`. |
+| `--provider`, `-p` | `claude` или `openai`; `run` использует `claude`, `resume` сохраняет прежний выбор. |
 | `--model`, `-m` | Переопределить модель провайдера. |
 | `--debug`, `-d` | Логировать фрагменты промптов и структурированных ответов. |
 
@@ -141,7 +142,7 @@ curl -X POST http://localhost:8000/api/projects \
 Получить состояние:
 
 ```bash
-curl http://localhost:8000/api/projects/projects/observatory/state
+curl http://localhost:8000/api/projects/observatory/state
 ```
 
 Выбрать концепцию, когда пайплайн ждёт ввода:
@@ -149,16 +150,25 @@ curl http://localhost:8000/api/projects/projects/observatory/state
 ```bash
 curl -X POST http://localhost:8000/api/projects/<project_id>/select-concept \
   -H "Content-Type: application/json" \
-  -d '{"concept_index": 0}'
+  -d '{"concept_index": 0, "run_id": "<state.run.id>"}'
 ```
 
 `project_id` — UUID из ответа `POST /api/projects`; он также доступен как `state.id` в `project.json`.
 
+Продолжить после ошибки или перезапуска API:
+
+```bash
+curl -X POST http://localhost:8000/api/projects/observatory/resume \
+  -H "Content-Type: application/json" -d '{}'
+```
+
+Повторный параллельный запуск получает HTTP 409. Путь API задаётся относительно `PROJECTS_DIR` либо берётся целиком из возвращённого `project_dir` с URL encoding.
+
 Получить финальные файлы:
 
 ```bash
-curl http://localhost:8000/api/projects/projects/observatory/final/script.md
-curl http://localhost:8000/api/projects/projects/observatory/final/teleprompter.md
+curl http://localhost:8000/api/projects/observatory/final/script.md
+curl http://localhost:8000/api/projects/observatory/final/teleprompter.md
 ```
 
 Эндпоинты финальных файлов возвращают JSON с полем `content`, а не сырой Markdown.
@@ -179,7 +189,7 @@ python3 -m api.main
 ```bash
 # Терминал 2
 cd /Users/artem/Documents/SceneForge/web
-npm install
+npm ci
 npm run dev
 ```
 
@@ -191,7 +201,9 @@ npm run dev
 NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 ```
 
-Страница проекта показывает сохранённый `state.current_step`, читает концепции из `state.concepts.concepts` и отправляет выбор по `state.id`. После завершения кнопки скачивают Markdown из JSON-поля `content`. API пока не сообщает, выполняется ли фоновая задача или завершилась с ошибкой: текущий шаг отражает сохранённый прогресс, а не живой статус процесса. После перезапуска API продолжайте незавершённый проект через CLI.
+Страница проекта показывает `state.current_step` и `state.run.status`: выполнение, ожидание выбора, ошибка, прерывание или завершение. После сбоя доступна явная кнопка продолжения; сохранённые шаги не запускаются заново. Выбор привязан к `state.id` и текущему `state.run.id`, а кнопки скачивания возвращают Markdown из JSON-поля `content`.
+
+Один API-процесс обслуживает интерактивные очереди. API и CLI используют общий OS lock на проект. После смерти процесса lock освобождается, а чтение состояния отмечает оставшийся активным запуск как `interrupted`. Уже подтверждённый выбор сохраняется на диск и не теряется вместе с очередью.
 
 ## Файлы проекта
 
@@ -200,12 +212,15 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 ```text
 projects/<name>/
 ├── project.json
+├── .pipeline.lock
 └── final/
     ├── script.md
     └── teleprompter.md
 ```
 
 `project.json` — возобновляемое состояние. `current_step` — zero-based индекс следующего шага. После полного завершения `current_step` равен `10`.
+
+JSON сохраняется атомарной заменой с fsync. Поле `run` добавляется совместимо: старые проекты без него открываются и продолжаются. Незавершённый LLM-запрос после обрыва может повториться; exactly-once и восстановление ответа, который не успел сохраниться, не гарантируются.
 
 ## Тесты
 
@@ -224,6 +239,18 @@ python3 -m pytest tests/test_agents.py -v
 
 Тесты используют mock LLM-провайдеры и не требуют реальных API-ключей.
 
+```bash
+cd web
+npm ci
+npm run lint
+npx tsc --noEmit
+npm run build
+npx playwright install chromium
+npm run test:e2e
+```
+
+Lifecycle проверяется временными проектами и fake agents, включая реальную смерть subprocess и конкуренцию API/CLI. Browser-набор проверяет desktop/mobile с mock API. Качество генерации настоящими моделями и внешние сервисы этим не проверяются.
+
 ## Документация
 
 Полная документация находится в `docs/`:
@@ -234,5 +261,7 @@ python3 -m pytest tests/test_agents.py -v
 - [API reference](docs/api.md)
 - [Модели данных](docs/data-models.md)
 - [Руководство разработчика](docs/development.md)
+- [Восстановление запусков](docs/lifecycle.md)
+- [Оставшиеся работы](docs/roadmap.md)
 
 `CLAUDE.md` остаётся исходными проектными заметками и roadmap. Документация выше — сводная версия, сверенная с текущим кодом.

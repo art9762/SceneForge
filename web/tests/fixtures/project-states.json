@@ -4,6 +4,17 @@
       "id": "2cda9ad1-6122-47db-a5e2-353c86d7c08d",
       "raw_idea": "Фильм об обсерватории",
       "current_step": 0,
+      "run": {
+        "id": "fixture-run-initial",
+        "status": "running",
+        "provider": "claude",
+        "model": null,
+        "step_name": "brief",
+        "error": null,
+        "error_type": null,
+        "started_at": "2026-01-01T00:00:00Z",
+        "finished_at": null
+      },
       "brief": null,
       "concepts": null,
       "selected_concept_index": null,
@@ -36,6 +47,17 @@
       "id": "2cda9ad1-6122-47db-a5e2-353c86d7c08d",
       "raw_idea": "Фильм об обсерватории",
       "current_step": 2,
+      "run": {
+        "id": "fixture-run-waiting",
+        "status": "waiting_input",
+        "provider": "claude",
+        "model": null,
+        "step_name": "select_concept",
+        "error": null,
+        "error_type": null,
+        "started_at": "2026-01-01T00:00:00Z",
+        "finished_at": null
+      },
       "brief": {
         "title": "Обсерватория",
         "format": "документальный фильм",
@@ -106,6 +128,17 @@
       "id": "2cda9ad1-6122-47db-a5e2-353c86d7c08d",
       "raw_idea": "Фильм об обсерватории",
       "current_step": 10,
+      "run": {
+        "id": "fixture-run-complete",
+        "status": "completed",
+        "provider": "claude",
+        "model": null,
+        "step_name": "assemble",
+        "error": null,
+        "error_type": null,
+        "started_at": "2026-01-01T00:00:00Z",
+        "finished_at": "2026-01-01T00:00:00Z"
+      },
       "brief": {
         "title": "Обсерватория",
         "format": "документальный фильм",
@@ -169,6 +202,201 @@
       "production_notes": null,
       "edit_notes": null,
       "final_script": "# Готовый сценарий\nТекст",
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    },
+    "steps": [
+      "brief",
+      "concepts",
+      "select_concept",
+      "structure",
+      "draft_v1",
+      "critique",
+      "draft_v2",
+      "production",
+      "edit_notes",
+      "assemble"
+    ],
+    "total_steps": 10
+  },
+  "failed": {
+    "state": {
+      "id": "2cda9ad1-6122-47db-a5e2-353c86d7c08d",
+      "raw_idea": "Фильм об обсерватории",
+      "current_step": 2,
+      "run": {
+        "id": "fixture-run-failed",
+        "status": "failed",
+        "provider": "claude",
+        "model": null,
+        "step_name": "select_concept",
+        "error": "Шаг завершился ошибкой. Можно повторить.",
+        "error_type": "RuntimeError",
+        "started_at": "2026-01-01T00:00:00Z",
+        "finished_at": "2026-01-01T00:00:00Z"
+      },
+      "brief": {
+        "title": "Обсерватория",
+        "format": "документальный фильм",
+        "duration_minutes": 8.0,
+        "target_audience": "",
+        "tone": "",
+        "style": "",
+        "platform": "",
+        "goal": "",
+        "constraints": [],
+        "keywords": []
+      },
+      "concepts": {
+        "concepts": [
+          {
+            "name": "Концепция 1",
+            "direction": "",
+            "logline": "Логлайн 1",
+            "synopsis": "Синопсис 1",
+            "tone_description": "",
+            "why_it_works": ""
+          },
+          {
+            "name": "Концепция 2",
+            "direction": "",
+            "logline": "Логлайн 2",
+            "synopsis": "Синопсис 2",
+            "tone_description": "",
+            "why_it_works": ""
+          },
+          {
+            "name": "Концепция 3",
+            "direction": "",
+            "logline": "Логлайн 3",
+            "synopsis": "Синопсис 3",
+            "tone_description": "",
+            "why_it_works": ""
+          }
+        ]
+      },
+      "selected_concept_index": null,
+      "structure": null,
+      "draft_v1": null,
+      "critique": null,
+      "draft_v2": null,
+      "production_notes": null,
+      "edit_notes": null,
+      "final_script": null,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    },
+    "steps": [
+      "brief",
+      "concepts",
+      "select_concept",
+      "structure",
+      "draft_v1",
+      "critique",
+      "draft_v2",
+      "production",
+      "edit_notes",
+      "assemble"
+    ],
+    "total_steps": 10
+  },
+  "interrupted": {
+    "state": {
+      "id": "2cda9ad1-6122-47db-a5e2-353c86d7c08d",
+      "raw_idea": "Фильм об обсерватории",
+      "current_step": 2,
+      "run": {
+        "id": "fixture-run-interrupted",
+        "status": "interrupted",
+        "provider": "claude",
+        "model": null,
+        "step_name": "select_concept",
+        "error": "Процесс остановился. Можно продолжить.",
+        "error_type": null,
+        "started_at": "2026-01-01T00:00:00Z",
+        "finished_at": "2026-01-01T00:00:00Z"
+      },
+      "brief": {
+        "title": "Обсерватория",
+        "format": "документальный фильм",
+        "duration_minutes": 8.0,
+        "target_audience": "",
+        "tone": "",
+        "style": "",
+        "platform": "",
+        "goal": "",
+        "constraints": [],
+        "keywords": []
+      },
+      "concepts": {
+        "concepts": [
+          {
+            "name": "Концепция 1",
+            "direction": "",
+            "logline": "Логлайн 1",
+            "synopsis": "Синопсис 1",
+            "tone_description": "",
+            "why_it_works": ""
+          },
+          {
+            "name": "Концепция 2",
+            "direction": "",
+            "logline": "Логлайн 2",
+            "synopsis": "Синопсис 2",
+            "tone_description": "",
+            "why_it_works": ""
+          },
+          {
+            "name": "Концепция 3",
+            "direction": "",
+            "logline": "Логлайн 3",
+            "synopsis": "Синопсис 3",
+            "tone_description": "",
+            "why_it_works": ""
+          }
+        ]
+      },
+      "selected_concept_index": null,
+      "structure": null,
+      "draft_v1": null,
+      "critique": null,
+      "draft_v2": null,
+      "production_notes": null,
+      "edit_notes": null,
+      "final_script": null,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    },
+    "steps": [
+      "brief",
+      "concepts",
+      "select_concept",
+      "structure",
+      "draft_v1",
+      "critique",
+      "draft_v2",
+      "production",
+      "edit_notes",
+      "assemble"
+    ],
+    "total_steps": 10
+  },
+  "legacy": {
+    "state": {
+      "id": "2cda9ad1-6122-47db-a5e2-353c86d7c08d",
+      "raw_idea": "Фильм об обсерватории",
+      "current_step": 0,
+      "run": null,
+      "brief": null,
+      "concepts": null,
+      "selected_concept_index": null,
+      "structure": null,
+      "draft_v1": null,
+      "critique": null,
+      "draft_v2": null,
+      "production_notes": null,
+      "edit_notes": null,
+      "final_script": null,
       "created_at": "2026-01-01T00:00:00Z",
       "updated_at": "2026-01-01T00:00:00Z"
     },

@@ -12,6 +12,7 @@ web/node_modules/
 node_modules/
 .pytest_cache/
 *.log
+.DS_Store
 web/test-results/
 web/playwright-report/
 web/tsconfig.tsbuildinfo

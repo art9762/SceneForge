@@ -2,7 +2,7 @@
 
 import { useEffect, useReducer, useState } from "react";
 import { usePathname } from "next/navigation";
-import { getFinalFile, getProjectState, selectConcept, type FinalFilename, type ProjectResponse } from "@/lib/api";
+import { getFinalFile, getProjectState, resumeProject, selectConcept, type FinalFilename, type ProjectResponse } from "@/lib/api";
 
 export default function ProjectPage() {
   // Read the encoded URL once: catch-all params may retain escaped slashes
@@ -10,9 +10,12 @@ export default function ProjectPage() {
   const projectDir = decodeURIComponent(usePathname().slice("/project/".length));
   const [snapshot, setSnapshot] = useState<{ projectDir: string; data: ProjectResponse } | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [actionError, setActionError] = useState("");
-  const [selecting, setSelecting] = useState(false);
-  const [submittedProject, setSubmittedProject] = useState("");
+  const [actionFailure, setActionFailure] = useState<{ projectDir: string; message: string } | null>(null);
+  const actionError = actionFailure?.projectDir === projectDir ? actionFailure.message : "";
+  const [selectingProject, setSelectingProject] = useState("");
+  const selecting = selectingProject === projectDir;
+  const [submittedRuns, setSubmittedRuns] = useState<Set<string>>(new Set());
+  const [resumingProject, setResumingProject] = useState("");
   const [downloading, setDownloading] = useState<FinalFilename | null>(null);
   const [refreshVersion, refresh] = useReducer((version: number) => version + 1, 0);
   const data = snapshot?.projectDir === projectDir ? snapshot.data : null;
@@ -44,23 +47,42 @@ export default function ProjectPage() {
   }, [projectDir, refreshVersion]);
 
   async function handleSelect(index: number) {
-    if (!data || selecting || submittedProject === data.state.id) return;
-    setSelecting(true);
-    setActionError("");
+    if (!data || selecting || submittedRuns.has(data.state.run?.id || data.state.id)) return;
+    const target = projectDir;
+    setSelectingProject(target);
+    setActionFailure(null);
     try {
-      await selectConcept(data.state.id, index);
-      setSubmittedProject(data.state.id);
+      await selectConcept(data.state.id, index, data.state.run?.id);
+      setSubmittedRuns((previous) => new Set(previous).add(data.state.run?.id || data.state.id));
       refresh();
     } catch (error: unknown) {
-      setActionError(error instanceof Error ? error.message : "Не удалось выбрать концепцию");
+      setActionFailure({ projectDir: target, message: error instanceof Error ? error.message : "Не удалось выбрать концепцию" });
+      refresh();
     } finally {
-      setSelecting(false);
+      setSelectingProject((previous) => previous === target ? "" : previous);
+    }
+  }
+
+  async function handleResume() {
+    if (!data || resumingProject === projectDir) return;
+    const target = projectDir;
+    setResumingProject(target);
+    setActionFailure(null);
+    try {
+      await resumeProject(target);
+      refresh();
+    } catch (error: unknown) {
+      setActionFailure({ projectDir: target, message: error instanceof Error ? error.message : "Не удалось продолжить проект" });
+      refresh(); // A conflicting start can already be running in another tab.
+    } finally {
+      setResumingProject((previous) => previous === target ? "" : previous);
     }
   }
 
   async function download(filename: FinalFilename) {
+    const target = projectDir;
     setDownloading(filename);
-    setActionError("");
+    setActionFailure(null);
     try {
       const { content } = await getFinalFile(projectDir, filename);
       const url = URL.createObjectURL(new Blob([content], { type: "text/markdown;charset=utf-8" }));
@@ -72,7 +94,7 @@ export default function ProjectPage() {
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error: unknown) {
-      setActionError(error instanceof Error ? error.message : "Не удалось скачать файл");
+      setActionFailure({ projectDir: target, message: error instanceof Error ? error.message : "Не удалось скачать файл" });
     } finally {
       setDownloading(null);
     }
@@ -84,9 +106,11 @@ export default function ProjectPage() {
   const currentStep = Math.max(0, Math.min(state.current_step, total_steps));
   const progress = total_steps > 0 ? (currentStep / total_steps) * 100 : 0;
   const isDone = total_steps > 0 && state.current_step >= total_steps;
+  const activeRun = state.run?.status === "running" || state.run?.status === "waiting_input";
+  const canResume = !isDone && !activeRun;
   const concepts = state.concepts?.concepts ?? [];
   const needsSelection = steps[state.current_step] === "select_concept"
-    && concepts.length > 0 && state.selected_concept_index === null;
+    && concepts.length > 0 && state.selected_concept_index === null && state.run?.status === "waiting_input";
   const selectedConcept = state.selected_concept_index === null
     ? null : concepts[state.selected_concept_index];
 
@@ -102,7 +126,23 @@ export default function ProjectPage() {
         <div role="progressbar" aria-label="Прогресс проекта" aria-valuemin={0} aria-valuemax={total_steps} aria-valuenow={currentStep} className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden">
           <div className="h-full bg-blue-600 transition-all duration-500" style={{ width: `${progress}%` }} />
         </div>
-        <p className="text-sm text-zinc-400 mt-2">{isDone ? "Пайплайн завершён" : "Показан последний сохранённый шаг"}</p>
+        <p role="status" className="text-sm text-zinc-300 mt-2">
+          {isDone ? "Пайплайн завершён" : state.run?.status === "running" ? `Выполняется: ${steps[currentStep]}`
+            : state.run?.status === "waiting_input" ? "Ожидается выбор концепции"
+            : state.run?.status === "failed" ? "Выполнение завершилось ошибкой"
+            : state.run?.status === "interrupted" ? "Выполнение прервано"
+            : state.run?.status === "paused" ? "Отдельный шаг выполнен. Можно продолжить пайплайн."
+            : "Проект сохранён. Можно продолжить выполнение."}
+        </p>
+        {state.run?.error && <p role="alert" className="mt-2 text-red-400">{state.run.error}{state.run.error_type ? ` (${state.run.error_type})` : ""}</p>}
+        {canResume && (
+          <div className="mt-3 space-y-2">
+            <p className="text-sm text-zinc-400">Продолжим с шага «{steps[currentStep]}». Сохранённые шаги останутся; незавершённый запрос к модели может повториться.</p>
+            <button onClick={handleResume} disabled={resumingProject === projectDir} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded text-white">
+              {resumingProject === projectDir ? "Запускаем…" : state.run?.status === "failed" ? "Повторить с сохранённого шага" : "Продолжить с сохранённого шага"}
+            </button>
+          </div>
+        )}
       </div>
 
       <ol className="space-y-1" aria-label="Шаги проекта">
@@ -132,7 +172,7 @@ export default function ProjectPage() {
       {needsSelection && (
         <section className="space-y-3">
           <h2 className="text-lg font-medium text-white">Выберите концепцию</h2>
-          {submittedProject === state.id ? <p role="status" className="text-zinc-300">Выбор отправлен. Ждём следующий шаг…</p> : (
+          {submittedRuns.has(state.run?.id || state.id) ? <p role="status" className="text-zinc-300">Выбор отправлен. Ждём следующий шаг…</p> : (
             <div className="grid gap-3">
               {concepts.map((concept, index) => (
                 <div key={index} className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">

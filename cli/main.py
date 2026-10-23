@@ -10,7 +10,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import IntPrompt
 
-from core.pipeline import Pipeline
+from core.pipeline import Pipeline, load_project_state
+from core.storage import ProjectBusyError
 from core.schemas.project import ProjectState
 from core.config import get_settings
 from core.agents.base import set_debug_mode
@@ -76,7 +77,12 @@ def run(
         on_select_concept=_select_concept,
     )
 
-    state = asyncio.run(pipeline.run(raw_idea=idea))
+    try:
+        prepared = pipeline.prepare_run(idea, create_only=True)
+    except (ProjectBusyError, FileExistsError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from None
+    asyncio.run(pipeline.run(prepared=prepared))
 
     console.print(f"\n[bold green]Результат сохранён в: {project_dir}/final/[/bold green]")
     console.print(f"  • script.md — полный сценарий")
@@ -86,7 +92,7 @@ def run(
 @app.command()
 def resume(
     project_path: str = typer.Argument(..., help="Путь к папке проекта"),
-    provider: str = typer.Option("claude", "--provider", "-p"),
+    provider: str | None = typer.Option(None, "--provider", "-p"),
     model: str = typer.Option(None, "--model", "-m"),
     debug: bool = typer.Option(False, "--debug", "-d", help="Показывать промпты и raw-ответы LLM"),
 ):
@@ -102,14 +108,19 @@ def resume(
         console.print("[red]project.json не найден в указанной папке[/red]")
         raise typer.Exit(1)
 
+    saved = ProjectState.load(project_dir / 'project.json')
     pipeline = Pipeline(
         project_dir=project_dir,
-        provider_name=provider,
-        model=model,
+        provider_name=provider or (saved.run.provider if saved.run else 'claude'),
+        model=model if model is not None else (saved.run.model if saved.run else None),
         on_select_concept=_select_concept,
     )
 
-    asyncio.run(pipeline.run())
+    try:
+        asyncio.run(pipeline.run())
+    except ProjectBusyError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from None
     console.print(f"\n[bold green]Готово! Результат в: {project_dir}/final/[/bold green]")
 
 
@@ -124,7 +135,7 @@ def status(
         console.print("[red]Проект не найден[/red]")
         raise typer.Exit(1)
 
-    state = ProjectState.load(state_file)
+    state = load_project_state(project_dir)
     steps = [
         "Бриф", "Концепции", "Выбор концепции", "Структура",
         "Черновик v1", "Критика", "Черновик v2", "Продакшн",
@@ -140,6 +151,10 @@ def status(
         title="📋 Статус проекта",
         border_style="blue",
     ))
+    if state.run is not None:
+        console.print(f"Запуск: {state.run.status} · {state.run.provider} · {state.run.model or 'default model'}")
+        if state.run.error:
+            console.print(f"[red]{state.run.error}[/red]")
 
     for i, name in enumerate(steps):
         if i < state.current_step:
