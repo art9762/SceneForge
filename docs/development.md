@@ -184,7 +184,7 @@ Build:
 npm run build
 ```
 
-Важная инструкция из `web/AGENTS.md`: проект использует Next.js `16.2.4`; перед Next-specific изменениями нужно сверяться с локальной документацией в `node_modules/next/dist/docs/`.
+Важная инструкция из `web/AGENTS.md`: проект использует Next.js `16.4.2`; перед Next-specific изменениями нужно сверяться с локальной документацией в `node_modules/next/dist/docs/`.
 
 ### Frontend-контракт
 

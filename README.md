@@ -165,7 +165,7 @@ curl http://localhost:8000/api/projects/projects/observatory/final/teleprompter.
 
 ## Web UI
 
-Фронтенд находится в `web/` и использует Next.js `16.2.4`, React `19.2.4`, TypeScript и Tailwind CSS.
+Фронтенд находится в `web/` и использует Next.js `16.4.2`, React `19.2.4`, TypeScript и Tailwind CSS.
 
 Запустить API и фронтенд в двух терминалах:
 

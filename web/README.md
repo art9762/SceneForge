@@ -6,7 +6,7 @@
 
 ## Стек
 
-- Next.js `16.2.4`
+- Next.js `16.4.2`
 - React `19.2.4`
 - TypeScript
 - Tailwind CSS
