@@ -1,0 +1,189 @@
+{
+  "initial": {
+    "state": {
+      "id": "2cda9ad1-6122-47db-a5e2-353c86d7c08d",
+      "raw_idea": "Фильм об обсерватории",
+      "current_step": 0,
+      "brief": null,
+      "concepts": null,
+      "selected_concept_index": null,
+      "structure": null,
+      "draft_v1": null,
+      "critique": null,
+      "draft_v2": null,
+      "production_notes": null,
+      "edit_notes": null,
+      "final_script": null,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    },
+    "steps": [
+      "brief",
+      "concepts",
+      "select_concept",
+      "structure",
+      "draft_v1",
+      "critique",
+      "draft_v2",
+      "production",
+      "edit_notes",
+      "assemble"
+    ],
+    "total_steps": 10
+  },
+  "waiting": {
+    "state": {
+      "id": "2cda9ad1-6122-47db-a5e2-353c86d7c08d",
+      "raw_idea": "Фильм об обсерватории",
+      "current_step": 2,
+      "brief": {
+        "title": "Обсерватория",
+        "format": "документальный фильм",
+        "duration_minutes": 8.0,
+        "target_audience": "",
+        "tone": "",
+        "style": "",
+        "platform": "",
+        "goal": "",
+        "constraints": [],
+        "keywords": []
+      },
+      "concepts": {
+        "concepts": [
+          {
+            "name": "Концепция 1",
+            "direction": "",
+            "logline": "Логлайн 1",
+            "synopsis": "Синопсис 1",
+            "tone_description": "",
+            "why_it_works": ""
+          },
+          {
+            "name": "Концепция 2",
+            "direction": "",
+            "logline": "Логлайн 2",
+            "synopsis": "Синопсис 2",
+            "tone_description": "",
+            "why_it_works": ""
+          },
+          {
+            "name": "Концепция 3",
+            "direction": "",
+            "logline": "Логлайн 3",
+            "synopsis": "Синопсис 3",
+            "tone_description": "",
+            "why_it_works": ""
+          }
+        ]
+      },
+      "selected_concept_index": null,
+      "structure": null,
+      "draft_v1": null,
+      "critique": null,
+      "draft_v2": null,
+      "production_notes": null,
+      "edit_notes": null,
+      "final_script": null,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    },
+    "steps": [
+      "brief",
+      "concepts",
+      "select_concept",
+      "structure",
+      "draft_v1",
+      "critique",
+      "draft_v2",
+      "production",
+      "edit_notes",
+      "assemble"
+    ],
+    "total_steps": 10
+  },
+  "complete": {
+    "state": {
+      "id": "2cda9ad1-6122-47db-a5e2-353c86d7c08d",
+      "raw_idea": "Фильм об обсерватории",
+      "current_step": 10,
+      "brief": {
+        "title": "Обсерватория",
+        "format": "документальный фильм",
+        "duration_minutes": 8.0,
+        "target_audience": "",
+        "tone": "",
+        "style": "",
+        "platform": "",
+        "goal": "",
+        "constraints": [],
+        "keywords": []
+      },
+      "concepts": {
+        "concepts": [
+          {
+            "name": "Концепция 1",
+            "direction": "",
+            "logline": "Логлайн 1",
+            "synopsis": "Синопсис 1",
+            "tone_description": "",
+            "why_it_works": ""
+          },
+          {
+            "name": "Концепция 2",
+            "direction": "",
+            "logline": "Логлайн 2",
+            "synopsis": "Синопсис 2",
+            "tone_description": "",
+            "why_it_works": ""
+          },
+          {
+            "name": "Концепция 3",
+            "direction": "",
+            "logline": "Логлайн 3",
+            "synopsis": "Синопсис 3",
+            "tone_description": "",
+            "why_it_works": ""
+          }
+        ]
+      },
+      "selected_concept_index": 0,
+      "structure": null,
+      "draft_v1": null,
+      "critique": {
+        "overall_score": 8,
+        "strengths": [
+          "Сильный хук"
+        ],
+        "weaknesses": [
+          {
+            "area": "Пейсинг",
+            "issue": "Длинная сцена",
+            "suggestion": "Сократить"
+          }
+        ],
+        "suggestions": [
+          "Добавить звуковые детали"
+        ]
+      },
+      "draft_v2": null,
+      "production_notes": null,
+      "edit_notes": null,
+      "final_script": "# Готовый сценарий\nТекст",
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    },
+    "steps": [
+      "brief",
+      "concepts",
+      "select_concept",
+      "structure",
+      "draft_v1",
+      "critique",
+      "draft_v2",
+      "production",
+      "edit_notes",
+      "assemble"
+    ],
+    "total_steps": 10
+  }
+}
