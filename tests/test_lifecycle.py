@@ -85,6 +85,27 @@ async def choose(client, state, index=0):
     return await client.post(f'/api/projects/{state.id}/select-concept', json={'concept_index': index, 'run_id': state.run.id})
 
 
+async def test_created_project_returns_relative_path_for_web_round_trip(client, tmp_path):
+    response = await client.post('/api/projects', json={
+        'raw_idea': 'Synthetic contract fixture', 'project_name': 'Новый проект',
+    })
+    assert response.status_code == 200
+    created = response.json()
+    assert created['project_dir'] == 'Новый-проект'
+    assert not Path(created['project_dir']).is_absolute()
+    prefix = f"/api/projects/{created['project_dir']}"
+    state_response = await client.get(prefix + '/state')
+    assert state_response.status_code == 200
+    assert state_response.json()['state']['id'] == created['project_id']
+    path = tmp_path / created['project_dir'] / 'project.json'
+    waiting = await saved_when(path, lambda state: state.run.status == 'waiting_input')
+    assert (await choose(client, waiting)).status_code == 200
+    await saved_when(path, lambda state: state.run.status == 'completed')
+    final = await client.get(prefix + '/final/script.md')
+    assert final.status_code == 200
+    assert final.json()['content']
+
+
 async def test_failure_is_persisted_and_retry_skips_committed_steps(client, tmp_path, fake_agents):
     fake_agents.fail = 'SceneWriter'
     path, waiting = await create_waiting(client, tmp_path, provider='openai', model='fixture-model')

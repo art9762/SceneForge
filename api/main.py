@@ -112,7 +112,8 @@ def _start_pipeline(pipeline: Pipeline, handle: PreparedRun) -> dict:
     task = asyncio.create_task(execute())
     _running[state.id] = task
     task.add_done_callback(finished)
-    return {'project_id': state.id, 'project_dir': str(pipeline.project_dir), 'run_id': state.run.id}
+    project_name = pipeline.project_dir.relative_to(Path(get_settings().projects_dir).resolve()).as_posix()
+    return {'project_id': state.id, 'project_dir': project_name, 'run_id': state.run.id}
 
 
 @app.post("/api/projects", response_model=dict)
