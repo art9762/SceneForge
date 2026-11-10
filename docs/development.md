@@ -184,9 +184,9 @@ Build:
 npm run build
 ```
 
-Важная инструкция из `web/AGENTS.md`: проект использует Next.js `16.2.4`; перед Next-specific изменениями нужно сверяться с локальной документацией в `node_modules/next/dist/docs/`.
+Важная инструкция из `web/AGENTS.md`: проект использует Next.js `16.4.2`; перед Next-specific изменениями нужно сверяться с локальной документацией в `node_modules/next/dist/docs/`.
 
-### Что нужно поправить во frontend-контракте
+### Frontend-контракт
 
 Текущий бэкенд возвращает:
 
@@ -198,7 +198,9 @@ npm run build
 }
 ```
 
-Текущая страница проекта ожидает объекты шагов с `name` и `status`, а также aliases вроде `selected_concept`, `critique.score` и concept `title`. Перед использованием Web UI нужно либо обновить frontend adapter, либо изменить форму ответа API.
+Типы `web/lib/api.ts` и страница проекта используют этот ответ напрямую: вложенный `current_step`, `concepts.concepts`, concept `name`, `selected_concept_index` и `critique.overall_score`. Страница показывает сохранённый прогресс, не приписывая API live-статусы. Выбор концепции отправляется по `state.id`, включая индекс `0`. Финальные файлы скачиваются из поля `content`.
+
+Для браузерных регрессий: `cd web && npx playwright install chromium && npm run build && npm run test:e2e`. Тесты покрывают desktop/mobile с mock API, а `tests/test_web_contract.py` сверяет fixtures с настоящим API. API-ключи не нужны.
 
 ## Roadmap из проектных заметок
 
